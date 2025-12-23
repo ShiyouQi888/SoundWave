@@ -23,6 +23,7 @@ import {
   CloudDownload,
   UserCircle,
   ImagePlus,
+  X,
 } from "lucide-react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -33,7 +34,7 @@ const navItems = [
   { href: "/effects", label: "音效调节", icon: Sliders },
 ]
 
-export function Sidebar() {
+export function Sidebar({ onClose }: { onClose?: () => void }) {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const { playlist, addTrack, removeTrack, selectTrack, currentTrack, importPlaylist, avatarImage, setAvatarImage } =
@@ -43,6 +44,12 @@ export function Sidebar() {
   const [importUrl, setImportUrl] = useState("")
   const [importing, setImporting] = useState(false)
   const [importDialogOpen, setImportDialogOpen] = useState(false)
+
+  const handleNavClick = () => {
+    if (window.innerWidth < 768 && onClose) {
+      onClose()
+    }
+  }
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files
@@ -98,21 +105,35 @@ export function Sidebar() {
       {/* Header */}
       <div className="flex items-center justify-between p-4 border-b border-border/50">
         {!collapsed && (
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 rounded-lg bg-primary/20">
-              <Music2 className="w-5 h-5 text-primary" />
+          <div className="flex items-center gap-2 overflow-hidden">
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <Music2 className="w-5 h-5 text-primary-foreground" />
             </div>
-            <span className="font-bold text-lg">SoundWave</span>
+            <span className="font-bold text-xl tracking-tight bg-gradient-to-r from-primary to-purple-400 bg-clip-text text-transparent truncate">
+              SoundWave
+            </span>
           </div>
         )}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setCollapsed(!collapsed)}
-          className={cn("shrink-0", collapsed && "mx-auto")}
-        >
-          {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
-        </Button>
+        <div className="flex items-center gap-1">
+          {onClose && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="md:hidden h-8 w-8"
+              onClick={onClose}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed(!collapsed)}
+            className={cn("h-8 w-8", onClose && "hidden md:flex")}
+          >
+            {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+          </Button>
+        </div>
       </div>
 
       <div className="p-3 border-b border-border/50">
@@ -163,7 +184,7 @@ export function Sidebar() {
           const Icon = item.icon
           const isActive = pathname === item.href
           return (
-            <Link key={item.href} href={item.href}>
+            <Link key={item.href} href={item.href} onClick={handleNavClick}>
               <Button
                 variant={isActive ? "secondary" : "ghost"}
                 className={cn(

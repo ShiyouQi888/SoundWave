@@ -116,14 +116,14 @@ export function PlayerBar() {
         />
       </div>
 
-      <div className="h-[calc(100%-4px)] flex items-center px-4 gap-4">
+      <div className="h-[calc(100%-4px)] flex items-center px-4 gap-2 md:gap-4">
         {/* Track info */}
-        <div className="flex items-center gap-3 w-64 min-w-0">
-          <div className="w-12 h-12 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shrink-0 relative overflow-hidden">
+        <div className="flex items-center gap-3 w-auto md:w-64 min-w-0 flex-1 md:flex-none">
+          <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg bg-gradient-to-br from-primary/30 to-accent/30 flex items-center justify-center shrink-0 relative overflow-hidden">
             {currentTrack?.cover ? (
               <img src={currentTrack.cover || "/placeholder.svg"} alt="" className="w-full h-full object-cover" />
             ) : (
-              <Music2 className="w-6 h-6 text-primary" />
+              <Music2 className="w-5 h-5 md:w-6 md:h-6 text-primary" />
             )}
             {isPlaying && (
               <div className="absolute inset-0 bg-black/20 flex items-center justify-center">
@@ -133,7 +133,7 @@ export function PlayerBar() {
                       key={i}
                       className="w-0.5 bg-white rounded-full animate-pulse"
                       style={{
-                        height: `${8 + Math.random() * 6}px`,
+                        height: `${6 + Math.random() * 6}px`,
                         animationDelay: `${i * 0.15}s`,
                       }}
                     />
@@ -143,23 +143,23 @@ export function PlayerBar() {
             )}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="font-medium text-sm truncate">{currentTrack?.name || "未选择音乐"}</p>
-            <p className="text-xs text-muted-foreground truncate">{currentTrack?.artist || "未知艺术家"}</p>
+            <p className="font-medium text-xs md:text-sm truncate">{currentTrack?.name || "未选择音乐"}</p>
+            <p className="text-[10px] md:text-xs text-muted-foreground truncate">{currentTrack?.artist || "未知艺术家"}</p>
           </div>
         </div>
 
-        {/* Time display */}
-        <span className="text-xs text-muted-foreground tabular-nums w-20 text-right">
+        {/* Time display - Hidden on very small screens */}
+        <span className="text-[10px] md:text-xs text-muted-foreground tabular-nums w-auto md:w-20 text-right hidden sm:block">
           {formatTime(currentTime)} / {formatTime(duration)}
         </span>
 
-        <div className="flex-1 flex items-center justify-center gap-1">
-          {/* Shuffle */}
+        <div className="flex-none md:flex-1 flex items-center justify-center gap-0.5 md:gap-1">
+          {/* Shuffle - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
             onClick={toggleShuffle}
-            className={cn("h-8 w-8", isShuffled ? "text-primary" : "text-muted-foreground hover:text-foreground")}
+            className={cn("h-8 w-8 hidden md:flex", isShuffled ? "text-primary" : "text-muted-foreground hover:text-foreground")}
             title={isShuffled ? "随机播放开" : "随机播放关"}
           >
             <Shuffle className="w-4 h-4" />
@@ -177,13 +177,13 @@ export function PlayerBar() {
             <SkipBack className="w-4 h-4" />
           </Button>
 
-          {/* Rewind */}
+          {/* Rewind - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => skip(-10)}
             disabled={!currentTrack}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hidden sm:flex"
             title="快退10秒"
           >
             <Rewind className="w-4 h-4" />
@@ -194,19 +194,19 @@ export function PlayerBar() {
             onClick={togglePlay}
             disabled={!currentTrack}
             size="icon"
-            className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/30"
+            className="w-10 h-10 md:w-12 md:h-12 rounded-full bg-gradient-to-br from-primary to-accent hover:opacity-90 text-primary-foreground shadow-lg shadow-primary/30 mx-1"
             title={isPlaying ? "暂停" : "播放"}
           >
             {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5 ml-0.5" />}
           </Button>
 
-          {/* Fast Forward */}
+          {/* Fast Forward - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
             onClick={() => skip(10)}
             disabled={!currentTrack}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            className="h-8 w-8 text-muted-foreground hover:text-foreground hidden sm:flex"
             title="快进10秒"
           >
             <FastForward className="w-4 h-4" />
@@ -224,13 +224,13 @@ export function PlayerBar() {
             <SkipForward className="w-4 h-4" />
           </Button>
 
-          {/* Repeat */}
+          {/* Repeat - Hidden on mobile */}
           <Button
             variant="ghost"
             size="icon"
             onClick={cycleRepeatMode}
             className={cn(
-              "h-8 w-8",
+              "h-8 w-8 hidden md:flex",
               repeatMode !== "none" ? "text-primary" : "text-muted-foreground hover:text-foreground",
             )}
             title={getRepeatLabel()}
@@ -239,8 +239,36 @@ export function PlayerBar() {
           </Button>
         </div>
 
-        {/* Volume & extras */}
-        <div className="flex items-center gap-2 w-64 justify-end">
+        {/* Tools and volume */}
+        <div className="flex items-center justify-end gap-1 md:gap-2 w-auto md:w-64">
+          <div className="items-center gap-2 flex-1 max-w-[120px] hidden lg:flex">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMute}
+              className="h-8 w-8 text-muted-foreground hover:text-foreground shrink-0"
+            >
+              {isMuted || volume === 0 ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
+            </Button>
+            <Slider
+              value={[isMuted ? 0 : volume * 100]}
+              max={100}
+              step={1}
+              onValueChange={(vals) => setVolume(vals[0] / 100)}
+              className="w-full"
+            />
+          </div>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={toggleFullscreen}
+            className="h-8 w-8 text-muted-foreground hover:text-foreground"
+            title={isFullscreen ? "退出全屏" : "全屏模式"}
+          >
+            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
+          </Button>
+          
           {/* Playlist */}
           <DropdownMenu open={showPlaylist} onOpenChange={setShowPlaylist}>
             <DropdownMenuTrigger asChild>
@@ -281,35 +309,6 @@ export function PlayerBar() {
               )}
             </DropdownMenuContent>
           </DropdownMenu>
-
-          {/* Volume */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleMute}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title={isMuted ? "取消静音" : "静音"}
-          >
-            {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
-          </Button>
-          <Slider
-            value={[isMuted ? 0 : volume]}
-            max={1}
-            step={0.01}
-            onValueChange={(v) => setVolume(v[0])}
-            className="w-20"
-          />
-
-          {/* Fullscreen */}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={toggleFullscreen}
-            className="h-8 w-8 text-muted-foreground hover:text-foreground"
-            title={isFullscreen ? "退出全屏" : "全屏"}
-          >
-            {isFullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
-          </Button>
         </div>
       </div>
     </div>

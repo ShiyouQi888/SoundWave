@@ -100,14 +100,14 @@ export default function PlaylistPage() {
 
   return (
     <div className="h-full flex flex-col">
-      <header className="px-6 py-4 border-b border-border/50">
-        <h1 className="text-2xl font-bold">播放列表</h1>
-        <p className="text-muted-foreground mt-1">管理你的音乐库，导入QQ音乐或网易云歌单</p>
+      <header className="px-4 md:px-6 py-4 border-b border-border/50">
+        <h1 className="text-xl md:text-2xl font-bold">播放列表</h1>
+        <p className="text-sm text-muted-foreground mt-1">管理你的音乐库，导入QQ音乐或网易云歌单</p>
       </header>
 
-      <div className="p-6 border-b border-border/50 space-y-4">
+      <div className="p-4 md:p-6 border-b border-border/50 space-y-4">
         {/* Upload & URL */}
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-2 md:gap-3">
           <input
             ref={fileInputRef}
             type="file"
@@ -116,7 +116,7 @@ export default function PlaylistPage() {
             onChange={handleFileUpload}
             className="hidden"
           />
-          <Button onClick={() => fileInputRef.current?.click()} className="gap-2">
+          <Button onClick={() => fileInputRef.current?.click()} className="gap-2 flex-1 sm:flex-initial">
             <Upload className="w-4 h-4" />
             上传本地音乐
           </Button>
@@ -125,13 +125,13 @@ export default function PlaylistPage() {
             <DialogTrigger asChild>
               <Button
                 variant="outline"
-                className="gap-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 bg-transparent"
+                className="gap-2 border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10 bg-transparent flex-1 sm:flex-initial"
               >
                 <FolderOpen className="w-4 h-4" />
                 导入歌单
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50">
+            <DialogContent className="w-[95vw] sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 p-4 sm:p-6">
               <DialogHeader>
                 <DialogTitle>导入音乐歌单</DialogTitle>
               </DialogHeader>
@@ -160,7 +160,7 @@ export default function PlaylistPage() {
                   <Button
                     onClick={() => handleImport("qqmusic")}
                     disabled={importing || !importUrl.trim()}
-                    className="w-full bg-green-600 hover:bg-green-700"
+                    className="w-full bg-green-600 hover:bg-green-700 h-10 md:h-11"
                   >
                     {importing ? "导入中..." : "导入QQ音乐歌单"}
                   </Button>
@@ -175,19 +175,19 @@ export default function PlaylistPage() {
                   <Button
                     onClick={() => handleImport("netease")}
                     disabled={importing || !importUrl.trim()}
-                    className="w-full bg-red-600 hover:bg-red-700"
+                    className="w-full bg-red-600 hover:bg-red-700 h-10 md:h-11"
                   >
                     {importing ? "导入中..." : "导入网易云歌单"}
                   </Button>
                 </TabsContent>
               </Tabs>
-              <p className="text-xs text-muted-foreground">注：由于版权限制，导入功能需要后端API支持。</p>
+              <p className="text-xs text-muted-foreground text-center">注：由于版权限制，导入功能需要后端API支持。</p>
             </DialogContent>
           </Dialog>
         </div>
 
         {/* URL input */}
-        <div className="flex gap-2">
+        <div className="flex flex-col sm:flex-row gap-2">
           <Input
             placeholder="输入音乐链接..."
             value={urlInput}
@@ -195,14 +195,14 @@ export default function PlaylistPage() {
             onKeyDown={(e) => e.key === "Enter" && handleUrlSubmit()}
             className="flex-1"
           />
-          <Button onClick={handleUrlSubmit} variant="outline" className="gap-2 bg-transparent">
+          <Button onClick={handleUrlSubmit} variant="outline" className="gap-2 bg-transparent whitespace-nowrap">
             <Link2 className="w-4 h-4" />
-            添加
+            添加链接
           </Button>
         </div>
 
         {playlist.length > 0 && (
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <Input
               placeholder="输入歌单名称保存..."
               value={playlistName}
@@ -212,17 +212,17 @@ export default function PlaylistPage() {
             <Button
               onClick={handleSavePlaylist}
               variant="outline"
-              className="gap-2 border-primary/50 text-primary hover:bg-primary/10 bg-transparent"
+              className="gap-2 border-primary/50 text-primary hover:bg-primary/10 bg-transparent whitespace-nowrap"
             >
               <Save className="w-4 h-4" />
-              保存歌单
+              保存当前列表
             </Button>
           </div>
         )}
       </div>
 
       <ScrollArea className="flex-1">
-        <div className="p-6 space-y-6">
+        <div className="p-4 md:p-6 space-y-6">
           {savedPlaylists.length > 0 && (
             <div className="space-y-3">
               <h3 className="text-lg font-semibold flex items-center gap-2">
@@ -279,7 +279,7 @@ export default function PlaylistPage() {
                   <div
                     key={track.id}
                     className={cn(
-                      "group flex items-center gap-4 p-4 rounded-xl transition-all cursor-pointer",
+                      "group flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-xl transition-all cursor-pointer",
                       currentTrack?.id === track.id
                         ? "bg-primary/10 border border-primary/30"
                         : "bg-secondary/30 hover:bg-secondary/50 border border-transparent",
@@ -288,22 +288,22 @@ export default function PlaylistPage() {
                   >
                     <div
                       className={cn(
-                        "w-12 h-12 rounded-lg flex items-center justify-center shrink-0 transition-all",
+                        "w-10 h-10 md:w-12 md:h-12 rounded-lg flex items-center justify-center shrink-0 transition-all",
                         currentTrack?.id === track.id
                           ? "bg-primary text-primary-foreground"
                           : "bg-secondary group-hover:bg-primary/20",
                       )}
                     >
                       {currentTrack?.id === track.id && isPlaying ? (
-                        <Pause className="w-5 h-5" />
+                        <Pause className="w-4 h-4 md:w-5 md:h-5" />
                       ) : (
-                        <Play className="w-5 h-5 ml-0.5" />
+                        <Play className="w-4 h-4 md:w-5 md:h-5 ml-0.5" />
                       )}
                     </div>
 
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{track.name}</p>
-                      <p className="text-sm text-muted-foreground">
+                      <p className="font-medium truncate text-sm md:text-base">{track.name}</p>
+                      <p className="text-xs md:text-sm text-muted-foreground">
                         {track.artist ||
                           (track.type === "local"
                             ? "本地文件"
@@ -316,11 +316,11 @@ export default function PlaylistPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground tabular-nums">#{index + 1}</span>
+                      <span className="hidden sm:inline text-xs text-muted-foreground tabular-nums">#{index + 1}</span>
                       <Button
                         variant="ghost"
                         size="icon"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity h-8 w-8"
                         onClick={(e) => {
                           e.stopPropagation()
                           removeTrack(track.id)

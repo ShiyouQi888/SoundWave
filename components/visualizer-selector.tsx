@@ -11,7 +11,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 interface VisualizerSelectorProps {
   selected: VisualizerType
   onSelect: (type: VisualizerType) => void
-  layout?: "horizontal" | "grid"
+  layout?: "horizontal" | "grid" | "list"
 }
 
 const visualizers: { type: VisualizerType; label: string; icon: React.ReactNode; color: string }[] = [
@@ -32,21 +32,48 @@ const visualizers: { type: VisualizerType; label: string; icon: React.ReactNode;
 export function VisualizerSelector({ selected, onSelect, layout = "horizontal" }: VisualizerSelectorProps) {
   if (layout === "grid") {
     return (
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2 md:gap-3">
         {visualizers.map((v) => (
           <button
             key={v.type}
             onClick={() => onSelect(v.type)}
             className={cn(
-              "flex flex-col items-center gap-2 p-4 rounded-xl border transition-all",
+              "flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 rounded-xl border transition-all",
               selected === v.type
                 ? "border-primary bg-primary/10 text-primary"
                 : "border-border hover:border-primary/50 hover:bg-secondary/50",
             )}
           >
-            <span className={cn(selected === v.type ? "text-primary" : v.color)}>{v.icon}</span>
-            <span className="text-sm font-medium">{v.label}</span>
+            <span className={cn("shrink-0", selected === v.type ? "text-primary" : v.color)}>{v.icon}</span>
+            <span className="text-xs md:text-sm font-medium">{v.label}</span>
           </button>
+        ))}
+      </div>
+    )
+  }
+
+  if (layout === "list") {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {visualizers.map((v) => (
+          <Button
+            key={v.type}
+            variant="ghost"
+            size="sm"
+            onClick={() => onSelect(v.type)}
+            className={cn(
+              "w-full justify-start gap-3 px-2.5 h-9 transition-all hover:bg-primary/10 group",
+              selected === v.type ? "bg-primary/20 text-primary hover:bg-primary/30" : "hover:bg-secondary/50",
+            )}
+          >
+            <span className={cn(
+              "shrink-0 transition-transform group-hover:scale-110 duration-200", 
+              selected === v.type ? "text-primary" : v.color
+            )}>
+              {v.icon}
+            </span>
+            <span className="text-xs font-medium">{v.label}</span>
+          </Button>
         ))}
       </div>
     )
@@ -67,7 +94,7 @@ export function VisualizerSelector({ selected, onSelect, layout = "horizontal" }
             )}
           >
             <span className={cn(selected === v.type ? "text-primary" : v.color)}>{v.icon}</span>
-            <span className="hidden lg:inline">{v.label}</span>
+            <span className="hidden sm:inline text-xs">{v.label}</span>
           </Button>
         ))}
       </div>

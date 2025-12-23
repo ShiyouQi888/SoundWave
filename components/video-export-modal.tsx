@@ -424,12 +424,13 @@ export function VideoExportModal() {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2 bg-transparent">
+        <Button variant="outline" size="sm" className="gap-2 bg-transparent h-9 md:h-10 px-4">
           <Video className="w-4 h-4" />
-          导出视频
+          <span className="hidden sm:inline">导出视频</span>
+          <span className="sm:hidden">导出</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="w-[95vw] sm:max-w-md bg-background/95 backdrop-blur-xl border-border/50 p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Video className="w-5 h-5 text-primary" />

@@ -627,6 +627,14 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       const centerY = height / 2
       const radius = Math.min(width, height) * 0.35
       
+      // --- 仪表盘整体参数 (提前定义以修复 ReferenceError) ---
+      const dashWidth = Math.min(width * 0.9, 1000)
+      const dashHeight = dashWidth * 0.35
+      const dashX = centerX - dashWidth / 2
+      const dashY = centerY - dashHeight / 2
+      const gaugeRadius = dashHeight * 0.8
+      const scaleFactor = dashWidth / 1000 // 缩放因子，用于调整字体和线宽
+
       // 1. 基础物理数据计算
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
       const bassEnergy = safeNumber(data.slice(0, 10).reduce((sum, val) => sum + val, 0) / 10 / 255, 0)
@@ -742,7 +750,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
             // 顶部危险条纹背景
             if (isFlashRed && lightIntensity > 0.8) {
                 ctx.fillStyle = "rgba(255, 0, 0, 0.15)"
-                ctx.font = "bold 120px Arial"
+                ctx.font = `bold ${Math.max(40, 120 * scaleFactor)}px Arial`
                 ctx.textAlign = "center"
                 ctx.textBaseline = "middle"
                 ctx.globalAlpha = 0.2 * lightIntensity
@@ -759,13 +767,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.save()
       ctx.translate(shakeX, shakeY)
-
-      // --- 仪表盘整体参数 ---
-      const dashWidth = Math.min(width * 0.9, 1000)
-      const dashHeight = dashWidth * 0.35
-      const dashX = centerX - dashWidth / 2
-      const dashY = centerY - dashHeight / 2
-      const gaugeRadius = dashHeight * 0.8
 
       // 【核心修改】将警灯绘制放在仪表盘绘制之前，且在 translate 之后，确保层级在下且跟随抖动
       if (lightIntensity > 0) {
@@ -822,10 +823,10 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
               ctx.stroke()
               
               if (isMajor) {
-                  ctx.font = "12px Arial"
+                  ctx.font = `${Math.round(12 * scaleFactor)}px Arial`
                   ctx.fillStyle = "rgba(255, 255, 255, 0.6)"
                   ctx.textAlign = "center"
-                  ctx.fillText(i.toString(), gx + Math.cos(angle) * (gaugeRadius - 35), gy + Math.sin(angle) * (gaugeRadius - 35))
+                  ctx.fillText(i.toString(), gx + Math.cos(angle) * (gaugeRadius - 35 * scaleFactor), gy + Math.sin(angle) * (gaugeRadius - 35 * scaleFactor))
               }
           }
 
@@ -833,33 +834,33 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
           const needleAngle = Math.PI * 0.75 + (speedValue / 220) * (Math.PI * 0.8)
           ctx.save()
           ctx.strokeStyle = "#ff3333"
-          ctx.lineWidth = 4
-          ctx.shadowBlur = 10
+          ctx.lineWidth = 4 * scaleFactor
+          ctx.shadowBlur = 10 * scaleFactor
           ctx.shadowColor = "#ff3333"
           ctx.beginPath()
           ctx.moveTo(gx, gy)
-          ctx.lineTo(gx + Math.cos(needleAngle) * (gaugeRadius - 15), gy + Math.sin(needleAngle) * (gaugeRadius - 15))
+          ctx.lineTo(gx + Math.cos(needleAngle) * (gaugeRadius - 15 * scaleFactor), gy + Math.sin(needleAngle) * (gaugeRadius - 15 * scaleFactor))
           ctx.stroke()
           
           // 指针中心轴
           ctx.fillStyle = "#fff"
           ctx.beginPath()
-          ctx.arc(gx, gy, 6, 0, Math.PI * 2)
+          ctx.arc(gx, gy, 6 * scaleFactor, 0, Math.PI * 2)
           ctx.fill()
           ctx.restore()
           
           // 数字显示
           ctx.save()
-          ctx.shadowBlur = 15
+          ctx.shadowBlur = 15 * scaleFactor
           ctx.shadowColor = "rgba(0, 0, 0, 0.9)" // 极黑阴影，确保在爆闪背景下清晰
-          ctx.font = "bold 72px 'Courier New', monospace"
+          ctx.font = `bold ${Math.round(72 * scaleFactor)}px 'Courier New', monospace`
           ctx.fillStyle = "#fff"
           ctx.textAlign = "center"
-          ctx.fillText(speedValue.toString(), gx, gy + 20)
+          ctx.fillText(speedValue.toString(), gx, gy + 20 * scaleFactor)
           ctx.restore()
-          ctx.font = "14px Arial"
+          ctx.font = `${Math.round(14 * scaleFactor)}px Arial`
           ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
-          ctx.fillText("km/h", gx + 60, gy + 20)
+          ctx.fillText("km/h", gx + 60 * scaleFactor, gy + 20 * scaleFactor)
       }
 
       // 3. 右侧转速表 (Tachometer)
@@ -869,7 +870,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
           
           // 外部装饰弧
           ctx.strokeStyle = "rgba(100, 150, 255, 0.2)"
-          ctx.lineWidth = 2
+          ctx.lineWidth = 2 * scaleFactor
           ctx.beginPath()
           ctx.arc(gx, gy, gaugeRadius, Math.PI * 1.4, Math.PI * 2.3)
           ctx.stroke()
@@ -880,49 +881,49 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
               const isRed = i >= 7
               
               ctx.strokeStyle = (8 - i) <= (parseFloat(rpmValue)) ? (isRed ? "#ff3333" : "#fff") : "rgba(255, 255, 255, 0.3)"
-              ctx.lineWidth = 3
+              ctx.lineWidth = 3 * scaleFactor
               ctx.beginPath()
-              ctx.moveTo(gx + Math.cos(angle) * (gaugeRadius - 5), gy + Math.sin(angle) * (gaugeRadius - 5))
-              ctx.lineTo(gx + Math.cos(angle) * (gaugeRadius - 25), gy + Math.sin(angle) * (gaugeRadius - 25))
+              ctx.moveTo(gx + Math.cos(angle) * (gaugeRadius - 5 * scaleFactor), gy + Math.sin(angle) * (gaugeRadius - 5 * scaleFactor))
+              ctx.lineTo(gx + Math.cos(angle) * (gaugeRadius - 25 * scaleFactor), gy + Math.sin(angle) * (gaugeRadius - 25 * scaleFactor))
               ctx.stroke()
               
-              ctx.font = "bold 16px Arial"
+              ctx.font = `bold ${Math.round(16 * scaleFactor)}px Arial`
               ctx.fillStyle = isRed ? "#ff3333" : "rgba(255, 255, 255, 0.6)"
               ctx.textAlign = "center"
-              ctx.fillText(i.toString(), gx + Math.cos(angle) * (gaugeRadius - 45), gy + Math.sin(angle) * (gaugeRadius - 45))
+              ctx.fillText(i.toString(), gx + Math.cos(angle) * (gaugeRadius - 45 * scaleFactor), gy + Math.sin(angle) * (gaugeRadius - 45 * scaleFactor))
           }
 
           // 新增：动态指针 (Needle)
           const needleAngle = Math.PI * 2.25 - (parseFloat(rpmValue) / 8) * (Math.PI * 0.8)
           ctx.save()
           ctx.strokeStyle = "#ff3333"
-          ctx.lineWidth = 4
-          ctx.shadowBlur = 10
+          ctx.lineWidth = 4 * scaleFactor
+          ctx.shadowBlur = 10 * scaleFactor
           ctx.shadowColor = "#ff3333"
           ctx.beginPath()
           ctx.moveTo(gx, gy)
-          ctx.lineTo(gx + Math.cos(needleAngle) * (gaugeRadius - 15), gy + Math.sin(needleAngle) * (gaugeRadius - 15))
+          ctx.lineTo(gx + Math.cos(needleAngle) * (gaugeRadius - 15 * scaleFactor), gy + Math.sin(needleAngle) * (gaugeRadius - 15 * scaleFactor))
           ctx.stroke()
           
           // 指针中心轴
           ctx.fillStyle = "#fff"
           ctx.beginPath()
-          ctx.arc(gx, gy, 6, 0, Math.PI * 2)
+          ctx.arc(gx, gy, 6 * scaleFactor, 0, Math.PI * 2)
           ctx.fill()
           ctx.restore()
           
           // 数字显示
           ctx.save()
-          ctx.shadowBlur = 15
+          ctx.shadowBlur = 15 * scaleFactor
           ctx.shadowColor = "rgba(0, 0, 0, 0.9)"
-          ctx.font = "bold 72px 'Courier New', monospace"
+          ctx.font = `bold ${Math.round(72 * scaleFactor)}px 'Courier New', monospace`
           ctx.fillStyle = "#fff"
           ctx.textAlign = "center"
-          ctx.fillText(rpmValue, gx, gy + 20)
+          ctx.fillText(rpmValue, gx, gy + 20 * scaleFactor)
           ctx.restore()
-          ctx.font = "14px Arial"
+          ctx.font = `${Math.round(14 * scaleFactor)}px Arial`
           ctx.fillStyle = "rgba(255, 255, 255, 0.5)"
-          ctx.fillText("x1000rpm", gx + 80, gy + 20)
+          ctx.fillText("x1000rpm", gx + 80 * scaleFactor, gy + 20 * scaleFactor)
       }
 
       // 4. 中央信息面板
@@ -934,24 +935,24 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
           
           // 车辆图标 (简单示意)
           ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"
-          ctx.lineWidth = 2
-          ctx.strokeRect(centerX - 15, centerY - 40, 30, 50)
+          ctx.lineWidth = 2 * scaleFactor
+          ctx.strokeRect(centerX - 15 * scaleFactor, centerY - 40 * scaleFactor, 30 * scaleFactor, 50 * scaleFactor)
           ctx.beginPath()
-          ctx.moveTo(centerX - 15, centerY - 15); ctx.lineTo(centerX - 25, centerY - 15) // 左车门开
+          ctx.moveTo(centerX - 15 * scaleFactor, centerY - 15 * scaleFactor); ctx.lineTo(centerX - 25 * scaleFactor, centerY - 15 * scaleFactor) // 左车门开
           ctx.stroke()
           
           // 温度和里程
-          ctx.font = "16px Arial"
+          ctx.font = `${Math.round(16 * scaleFactor)}px Arial`
           ctx.fillStyle = "#fff"
           ctx.textAlign = "left"
-          ctx.fillText("17℃", px + 10, py + ph - 10)
+          ctx.fillText("17℃", px + 10 * scaleFactor, py + ph - 10 * scaleFactor)
           ctx.textAlign = "right"
-          ctx.fillText("1000P", px + pw - 10, py + ph - 10)
+          ctx.fillText("1000P", px + pw - 10 * scaleFactor, py + ph - 10 * scaleFactor)
           
           // 顶部里程
           ctx.textAlign = "center"
-          ctx.font = "14px Arial"
-          ctx.fillText("⛽ 53km", centerX, py + 20)
+          ctx.font = `${Math.round(14 * scaleFactor)}px Arial`
+          ctx.fillText("⛽ 53km", centerX, py + 20 * scaleFactor)
       }
 
       // 5. 绘制警告图标
@@ -992,6 +993,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       const centerX = width / 2
       const centerY = height / 2
+      const pulseCenterY = centerY + 80 // 心电脉冲基准线向下微调 80 像素
 
       // 计算能量
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
@@ -1000,7 +1002,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       // 初始化缓冲区
       if (ecgBufferRef.current.length !== Math.ceil(width)) {
-        ecgBufferRef.current = new Array(Math.ceil(width)).fill(centerY)
+        ecgBufferRef.current = new Array(Math.ceil(width)).fill(pulseCenterY)
       }
 
       // 2. 绘制细绿色网格 (经典雷达/示波器风格)
@@ -1081,7 +1083,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
         const waveIndex = Math.floor((state.x / width) * data.length)
         const waveVal = (data[waveIndex] - 128) / 128 * 25 * avgEnergy 
         
-        ecgBufferRef.current[state.x] = centerY + yOffset + waveVal
+        ecgBufferRef.current[state.x] = pulseCenterY + yOffset + waveVal
       }
       
       // 4. 绘制心电线 (分段绘制以实现首尾区别)
@@ -1184,12 +1186,13 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       ctx.restore()
       
       // 左上角医疗信息 (也换成绿色/红色组合)
-      ctx.font = "bold 16px sans-serif"
+      const infoScale = Math.min(1, width / 800)
+      ctx.font = `bold ${Math.max(12, 16 * infoScale)}px sans-serif`
       ctx.fillStyle = "rgba(0, 255, 100, 0.8)"
-      ctx.fillText(`HR: ${Math.floor(65 + bassEnergy * 55)} BPM`, 25, 35)
-      ctx.font = "12px sans-serif"
+      ctx.fillText(`HR: ${Math.floor(65 + bassEnergy * 55)} BPM`, 25 * infoScale, 35 * infoScale)
+      ctx.font = `${Math.max(10, 12 * infoScale)}px sans-serif`
       ctx.fillStyle = "rgba(0, 255, 100, 0.5)"
-      ctx.fillText(`II  25mm/s  10mm/mV`, 25, 55)
+      ctx.fillText(`II  25mm/s  10mm/mV`, 25 * infoScale, 55 * infoScale)
     },
     [drawCenterAvatar],
   )
