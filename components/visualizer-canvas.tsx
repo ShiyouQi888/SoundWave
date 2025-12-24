@@ -114,7 +114,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
   const animationRef = useRef<number>()
   const particlesRef = useRef<Particle[]>([])
   const timeRef = useRef(0)
-  const starsRef = useRef<{ x: number; y: number; size: number; speed: number; twinkle: number }[]>([])
   const avatarImageRef = useRef<HTMLImageElement | null>(null)
   const avatarLoadedRef = useRef(false)
   const barColorsRef = useRef<{ hue: number; targetHue: number; speed: number }[]>([])
@@ -127,6 +126,9 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
   const coreVelocityRef = useRef(0)
   const coreHueRef = useRef(200)
   const ecgStateRef = useRef({ x: 0, lastBeat: 0, pulseIndex: -1, currentAmplitude: 1 })
+  const bulletHolesRef = useRef<{ x: number; y: number; size: number; life: number; cracks: { angle: number; length: number; opacity: number }[]; rings: { radius: number; points: { x: number; y: number }[] }[] }[]>([])
+  const shardsRef = useRef<{ x: number; y: number; vx: number; vy: number; size: number; rotation: number; vRotation: number; life: number; color: string }[]>([])
+  const lastHoleTimeRef = useRef(0)
   // 按照标准医学 ECG 波形设计: P波, Q波, R波, S波, T波
   // 采样点更加密集以支持平滑的贝塞尔绘制
   const pulsePattern = [
@@ -176,48 +178,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       electric: "rgba(255, 255, 100, ",
     }
   }, [])
-
-  const initStars = useCallback((width: number, height: number) => {
-    if (starsRef.current.length === 0) {
-      for (let i = 0; i < 300; i++) {
-        starsRef.current.push({
-          x: Math.random() * width,
-          y: Math.random() * height,
-          size: Math.random() * 2.5 + 0.5,
-          speed: Math.random() * 0.5 + 0.1,
-          twinkle: Math.random() * Math.PI * 2,
-        })
-      }
-    }
-  }, [])
-
-  const drawStars = useCallback(
-    (ctx: CanvasRenderingContext2D, width: number, height: number, energy: number) => {
-      initStars(width, height)
-      const safeEnergy = safeNumber(energy, 0)
-      starsRef.current.forEach((star) => {
-        star.y += star.speed * (1 + safeEnergy * 3)
-        star.twinkle += 0.05
-        if (star.y > height) {
-          star.y = 0
-          star.x = Math.random() * width
-        }
-        const twinkleAlpha = safeAlpha(0.3 + Math.sin(star.twinkle) * 0.3 + safeEnergy * 0.4)
-        const size = Math.max(0.1, star.size * (1 + safeEnergy * 0.8 + Math.sin(star.twinkle) * 0.3))
-
-        const gradient = safeCreateRadialGradient(ctx, star.x, star.y, 0, star.x, star.y, size * 3)
-        if (!gradient) return
-        safeAddColorStop(gradient, 0, safeRGBA(255, 255, 255, twinkleAlpha))
-        safeAddColorStop(gradient, 0.5, safeRGBA(200, 220, 255, twinkleAlpha * 0.3))
-        safeAddColorStop(gradient, 1, "transparent")
-        ctx.fillStyle = gradient
-        ctx.beginPath()
-        ctx.arc(star.x, star.y, Math.max(0.1, size * 3), 0, Math.PI * 2)
-        ctx.fill()
-      })
-    },
-    [initStars],
-  )
 
   const drawCenterGlow = useCallback(
     (ctx: CanvasRenderingContext2D, centerX: number, centerY: number, radius: number, energy: number) => {
@@ -343,13 +303,303 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
     [drawCenterGlow],
   )
 
+  // 碎裂玻璃 - 极致碎裂版
+  const drawSpheres = useCallback(
+    (ctx: CanvasRenderingContext2D, width: number, height: number, data: Uint8Array) => {
+      const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
+      
+      // 1. 震动效果计算
+      if (avgEnergy > 0.7) {
+        shakeRef.current = Math.max(shakeRef.current, avgEnergy * 20)
+      }
+      const shakeX = (Math.random() - 0.5) * shakeRef.current
+      const shakeY = (Math.random() - 0.5) * shakeRef.current
+      shakeRef.current *= 0.85 // 稍慢衰减，增加余震感
+
+      ctx.save()
+      ctx.translate(shakeX, shakeY)
+
+      // 2. 纯黑背景
+      ctx.fillStyle = "#000000"
+      ctx.fillRect(-50, -50, width + 100, height + 100)
+
+      const centerX = width / 2
+      const centerY = height / 2
+      const time = timeRef.current * 0.02
+
+      // 3. 弹孔生成逻辑
+      const now = Date.now()
+      // 降低触发阈值，增加连发感
+      if (avgEnergy > 0.62 && now - lastHoleTimeRef.current > 120) {
+        lastHoleTimeRef.current = now
+        const holeSize = 20 + avgEnergy * 50
+        
+        // 生成裂缝 (增加分支裂缝)
+        const cracksCount = Math.floor(10 + avgEnergy * 15)
+        const cracks = []
+        for (let i = 0; i < cracksCount; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const length = holeSize * (4 + Math.random() * 8)
+          
+          // 主裂纹
+          const mainCrack = {
+            angle,
+            length,
+            opacity: 0.5 + Math.random() * 0.5,
+            branches: [] as { angle: number; length: number; pos: number }[]
+          }
+
+          // 为长裂纹添加小分支
+          if (length > 100) {
+            const branchCount = Math.floor(Math.random() * 3)
+            for (let b = 0; b < branchCount; b++) {
+              mainCrack.branches.push({
+                angle: angle + (Math.random() - 0.5) * 1.5,
+                length: length * (0.2 + Math.random() * 0.3),
+                pos: 0.3 + Math.random() * 0.5 // 分支位置
+              })
+            }
+          }
+          cracks.push(mainCrack)
+        }
+
+        // 生成蜘蛛网状环
+        const rings = []
+        const ringCount = 4 + Math.floor(Math.random() * 4)
+        for (let r = 0; r < ringCount; r++) {
+          const radius = holeSize * (1 + r * 1.2)
+          const points = []
+          const segments = 16
+          for (let s = 0; s < segments; s++) {
+            const angle = (s / segments) * Math.PI * 2
+            const dist = radius * (0.85 + Math.random() * 0.3)
+            points.push({
+              x: Math.cos(angle) * dist,
+              y: Math.sin(angle) * dist
+            })
+          }
+          rings.push({ radius, points })
+        }
+
+        const holeX = Math.random() * width
+        const holeY = Math.random() * height
+
+        bulletHolesRef.current.push({
+          x: holeX,
+          y: holeY,
+          size: holeSize,
+          life: 1.0,
+          cracks,
+          rings
+        })
+
+        // 生成飞溅的玻璃碎片 (Shards) - 增加多样性
+        const shardCount = 15 + Math.floor(avgEnergy * 25)
+        for (let i = 0; i < shardCount; i++) {
+          const angle = Math.random() * Math.PI * 2
+          const speed = 8 + Math.random() * 20
+          const points = []
+          const sides = 3 + Math.floor(Math.random() * 3) // 3-5边形
+          for (let s = 0; s < sides; s++) {
+            const a = (s / sides) * Math.PI * 2
+            const d = 0.5 + Math.random() * 0.5
+            points.push({ x: Math.cos(a) * d, y: Math.sin(a) * d })
+          }
+
+          shardsRef.current.push({
+            x: holeX,
+            y: holeY,
+            vx: Math.cos(angle) * speed,
+            vy: Math.sin(angle) * speed - 2, // 初始微弱上抛
+            size: 3 + Math.random() * 10,
+            rotation: Math.random() * Math.PI * 2,
+            vRotation: (Math.random() - 0.5) * 0.6,
+            life: 1.0,
+            color: Math.random() > 0.4 ? "rgba(255, 255, 255, 0.9)" : "rgba(180, 220, 255, 0.6)",
+            points // 存储形状点
+          } as any)
+        }
+      }
+
+      // 更新碎片物理
+      shardsRef.current = shardsRef.current.filter(shard => {
+        shard.x += shard.vx
+        shard.y += shard.vy
+        shard.vy += 0.35 // 增加重力感
+        shard.vx *= 0.99
+        shard.rotation += shard.vRotation
+        shard.life -= 0.015
+        return shard.life > 0
+      })
+
+      // 更新弹孔生命周期
+      bulletHolesRef.current = bulletHolesRef.current.filter((hole) => {
+        hole.life -= 0.0025
+        return hole.life > 0
+      })
+
+      // 4. 绘制前面的一层“玻璃”
+      const glassGrad = ctx.createRadialGradient(centerX, centerY, 0, centerX, centerY, Math.sqrt(width*width + height*height)/2)
+      glassGrad.addColorStop(0, "rgba(255, 255, 255, 0.03)")
+      glassGrad.addColorStop(1, "rgba(255, 255, 255, 0.15)")
+      ctx.fillStyle = glassGrad
+      ctx.fillRect(0, 0, width, height)
+
+      // 绘制反光条 (增加锐利度)
+      ctx.save()
+      ctx.globalCompositeOperation = "screen"
+      for (let i = 0; i < 3; i++) {
+        const offset = ((time * 150 + i * 500) % (width + height * 1.5)) - height
+        const reflectGrad = ctx.createLinearGradient(0, offset, height, offset + height)
+        reflectGrad.addColorStop(0, "rgba(255, 255, 255, 0)")
+        reflectGrad.addColorStop(0.5, "rgba(255, 255, 255, 0.08)")
+        reflectGrad.addColorStop(1, "rgba(255, 255, 255, 0)")
+        ctx.fillStyle = reflectGrad
+        ctx.fillRect(0, 0, width, height)
+      }
+      ctx.restore()
+
+      // 5. 绘制弹孔细节
+      bulletHolesRef.current.forEach((hole) => {
+        const alpha = hole.life
+
+        // A. 绘制蜘蛛网环 (Rings)
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.4})`
+        ctx.lineWidth = 1
+        hole.rings.forEach(ring => {
+          ctx.beginPath()
+          ring.points.forEach((p, i) => {
+            if (i === 0) ctx.moveTo(hole.x + p.x, hole.y + p.y)
+            else ctx.lineTo(hole.x + p.x, hole.y + p.y)
+          })
+          ctx.closePath()
+          ctx.stroke()
+        })
+
+        // B. 绘制碎裂纹 (Cracks)
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.7})`
+        ctx.lineWidth = 1.5
+        hole.cracks.forEach((crack) => {
+          const endX = hole.x + Math.cos(crack.angle) * crack.length
+          const endY = hole.y + Math.sin(crack.angle) * crack.length
+          
+          ctx.beginPath()
+          ctx.moveTo(hole.x, hole.y)
+          
+          // 随机折线效果
+          const segments = 3
+          let lastX = hole.x
+          let lastY = hole.y
+          for (let s = 1; s <= segments; s++) {
+            const t = s / segments
+            const targetX = hole.x + Math.cos(crack.angle) * crack.length * t
+            const targetY = hole.y + Math.sin(crack.angle) * crack.length * t
+            const jitter = (1 - t) * 15 // 越远越直
+            const currentX = targetX + (Math.random() - 0.5) * jitter
+            const currentY = targetY + (Math.random() - 0.5) * jitter
+            
+            ctx.lineTo(currentX, currentY)
+            
+            // 绘制分支
+            const branch = (crack as any).branches?.find((b: any) => Math.abs(b.pos - t) < 0.2)
+            if (branch) {
+              ctx.save()
+              ctx.beginPath()
+              ctx.moveTo(currentX, currentY)
+              ctx.lineTo(
+                currentX + Math.cos(branch.angle) * branch.length,
+                currentY + Math.sin(branch.angle) * branch.length
+              )
+              ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.4})`
+              ctx.lineWidth = 0.8
+              ctx.stroke()
+              ctx.restore()
+            }
+            
+            lastX = currentX
+            lastY = currentY
+          }
+          ctx.stroke()
+        })
+
+        // C. 绘制中心撞击点 (增加深度感)
+        const holeGrad = ctx.createRadialGradient(hole.x, hole.y, 0, hole.x, hole.y, hole.size)
+        holeGrad.addColorStop(0, `rgba(0, 0, 0, ${alpha * 0.98})`)
+        holeGrad.addColorStop(0.3, `rgba(10, 10, 20, ${alpha * 0.9})`)
+        holeGrad.addColorStop(0.7, `rgba(40, 40, 50, ${alpha * 0.4})`)
+        holeGrad.addColorStop(1, "transparent")
+        
+        ctx.fillStyle = holeGrad
+        ctx.beginPath()
+        ctx.arc(hole.x, hole.y, hole.size, 0, Math.PI * 2)
+        ctx.fill()
+
+        // D. 撞击边缘白色亮线
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.9})`
+        ctx.lineWidth = 2.5
+        ctx.beginPath()
+        ctx.arc(hole.x, hole.y, hole.size * 0.35, 0, Math.PI * 2)
+        ctx.stroke()
+      })
+
+      // 6. 绘制飞溅碎片 (Shards)
+      shardsRef.current.forEach(shard => {
+        ctx.save()
+        ctx.translate(shard.x, shard.y)
+        ctx.rotate(shard.rotation)
+        ctx.fillStyle = shard.color
+        ctx.globalAlpha = shard.life
+        
+        // 绘制多边形碎片
+        ctx.beginPath()
+        const pts = (shard as any).points || []
+        pts.forEach((p: any, i: number) => {
+          if (i === 0) ctx.moveTo(p.x * shard.size, p.y * shard.size)
+          else ctx.lineTo(p.x * shard.size, p.y * shard.size)
+        })
+        ctx.closePath()
+        ctx.fill()
+        
+        // 添加边缘高光
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.8)"
+        ctx.lineWidth = 0.5
+        ctx.stroke()
+        
+        ctx.restore()
+      })
+
+      // 7. 中心头像
+      const avatarSize = 75 + avgEnergy * 35
+      if (avatarImageRef.current && avatarLoadedRef.current) {
+        ctx.save()
+        ctx.shadowBlur = 30 + avgEnergy * 40
+        ctx.shadowColor = "rgba(255, 255, 255, 0.7)"
+        
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, avatarSize, 0, Math.PI * 2)
+        ctx.clip()
+        ctx.drawImage(avatarImageRef.current, centerX - avatarSize, centerY - avatarSize, avatarSize * 2, avatarSize * 2)
+        ctx.restore()
+
+        // 头像边框也带点碎裂感？不，保持圆润但增加发光
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.95)"
+        ctx.lineWidth = 4
+        ctx.beginPath()
+        ctx.arc(centerX, centerY, avatarSize, 0, Math.PI * 2)
+        ctx.stroke()
+      }
+
+      ctx.restore()
+    },
+    [avatarImage],
+  )
+
   // 频谱柱状 - 对称极光版
   const drawBars = useCallback(
     (ctx: CanvasRenderingContext2D, width: number, height: number, data: Uint8Array) => {
       ctx.clearRect(0, 0, width, height)
 
       const avgEnergy = data.reduce((sum, val) => sum + val, 0) / data.length / 255
-      drawStars(ctx, width, height, avgEnergy)
 
       const barCount = 64
       // 动态计算间隙，使其自适应宽度
@@ -451,7 +701,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.restore()
     },
-    [drawStars],
+    [],
   )
 
   // 波浪曲线 - 1:1 参考图极致复刻版
@@ -614,7 +864,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.restore()
     },
-    [drawStars],
+    [],
   )
 
   const drawCircle = useCallback(
@@ -655,7 +905,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       const rpmValue = (rpmFactor * 8).toFixed(1)
       const hpValue = Math.floor(rpmFactor * 1000)
       
-      drawStars(ctx, width, height, avgEnergy)
 
       // 7. 警灯设计 (圆形爆闪扩散点 - 极致加强版)
       const drawPoliceLight = (x: number, y: number, isRed: boolean, intensity: number, sizeScale = 1.0) => {
@@ -980,7 +1229,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       ctx.restore()
       ctx.shadowBlur = 0
     },
-    [drawStars, drawCenterAvatar],
+    [drawCenterAvatar],
   )
 
   // 粒子爆发 - 星云风暴版
@@ -1207,8 +1456,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       const maxRadius = Math.min(width, height) * 0.35
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
 
-      drawStars(ctx, width, height, avgEnergy)
-      
       ctx.save()
       ctx.globalCompositeOperation = "screen" // 开启发光混合模式
 
@@ -1314,7 +1561,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.shadowBlur = 0
     },
-    [drawStars, drawCenterAvatar],
+    [drawCenterAvatar],
   )
 
   // 星系漩涡 - 3D 宇宙星云版 (极致 3D 深度与体积感)
@@ -1326,8 +1573,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       const centerY = height / 2
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
       const bassEnergy = safeNumber(data.slice(0, 20).reduce((sum, val) => sum + val, 0) / 20 / 255, 0)
-
-      drawStars(ctx, width, height, avgEnergy)
 
       ctx.save()
       ctx.globalCompositeOperation = "screen"
@@ -1492,7 +1737,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.restore()
     },
-    [drawStars, drawCenterAvatar],
+    [drawCenterAvatar],
   )
 
   // DNA 螺旋 - 3D 基因版
@@ -1502,8 +1747,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
       const centerY = height / 2
-      
-      drawStars(ctx, width, height, avgEnergy)
       
       ctx.save()
       ctx.globalCompositeOperation = "lighter"
@@ -1639,7 +1882,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       ctx.restore()
       ctx.shadowBlur = 0
     },
-    [drawStars],
+    [],
   )
 
   // 数字矩阵 - 骇客帝国版 (律动增强)
@@ -1764,8 +2007,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
       const bassEnergy = safeNumber(data.slice(0, 10).reduce((sum, val) => sum + val, 0) / 10 / 255, 0)
       
-      drawStars(ctx, width, height, avgEnergy)
-      
       // 衰减震动
       shakeRef.current *= 0.85
       const shakeX = (Math.random() - 0.5) * shakeRef.current
@@ -1889,7 +2130,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       
       ctx.restore()
     },
-    [drawStars],
+    [],
   )
 
   // 极光幻影
@@ -1898,8 +2139,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
       ctx.clearRect(0, 0, width, height)
 
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
-
-      drawStars(ctx, width, height, avgEnergy)
 
       const layers = 8
       for (let layer = 0; layer < layers; layer++) {
@@ -1933,7 +2172,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
         }
       }
     },
-    [drawStars],
+    [],
   )
 
   // 隧道穿梭 - 赛博空间版 (无限纵深)
@@ -1954,9 +2193,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
         0,
       )
       const time = timeRef.current * 0.02
-
-      // 绘制背景星空
-      drawStars(ctx, width, height, avgEnergy)
 
       // 绘制动态星云 (增加色彩层次)
       ctx.save()
@@ -2223,7 +2459,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
         }
       }
     },
-    [drawStars],
+    [],
   )
 
 
@@ -2235,9 +2471,6 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       const avgEnergy = safeNumber(data.reduce((sum, val) => sum + val, 0) / data.length / 255, 0)
       const bassEnergy = safeNumber(data.slice(0, 10).reduce((sum, val) => sum + val, 0) / 10 / 255, 0)
-
-      // 绘制远景星空
-      drawStars(ctx, width, height, avgEnergy)
 
       // 2. 绘制地面 (纵深感网格)
       const groundHeight = height * 0.8
@@ -2428,7 +2661,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
 
       ctx.shadowBlur = 0
     },
-    [drawStars],
+    [],
   )
 
   // 动画循环
@@ -2466,6 +2699,7 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
         aurora: () => drawAurora(ctx, canvas.width, canvas.height, analyserData),
         vortex: () => drawVortex(ctx, canvas.width, canvas.height, analyserData),
         lightning: () => drawLightning(ctx, canvas.width, canvas.height, analyserData),
+        spheres: () => drawSpheres(ctx, canvas.width, canvas.height, analyserData),
       }
 
       const drawFunction = drawFunctions[type]
@@ -2500,13 +2734,14 @@ export function VisualizerCanvas({ type, analyserData, isPlaying, avatarImage }:
     drawAurora,
     drawVortex,
     drawLightning,
+    drawSpheres,
   ])
 
   return (
     <canvas
       ref={canvasRef}
       className="absolute inset-0 w-full h-full"
-      style={{ background: "linear-gradient(to bottom, #0a0a0f, #1a1a2e)" }}
+      style={{ background: "#000000" }}
     />
   )
 }

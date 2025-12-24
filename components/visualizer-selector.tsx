@@ -4,7 +4,7 @@ import type React from "react"
 
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
-import { BarChart3, Waves, Circle, Activity, Radio, Orbit, Dna, Binary, Flame, Sun, Loader, Zap } from "lucide-react"
+import { BarChart3, Waves, Circle, Activity, Radio, Orbit, Dna, Binary, Flame, Sun, Loader, Zap, Shapes } from "lucide-react"
 import type { VisualizerType } from "@/lib/audio-context"
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area"
 
@@ -27,6 +27,7 @@ const visualizers: { type: VisualizerType; label: string; icon: React.ReactNode;
   { type: "aurora", label: "极光幻影", icon: <Sun className="w-5 h-5" />, color: "text-teal-400" },
   { type: "vortex", label: "隧道穿梭", icon: <Loader className="w-5 h-5" />, color: "text-violet-400" },
   { type: "lightning", label: "闪电风暴", icon: <Zap className="w-5 h-5" />, color: "text-yellow-400" },
+  { type: "spheres", label: "碎裂玻璃", icon: <Shapes className="w-5 h-5" />, color: "text-blue-500" },
 ]
 
 export function VisualizerSelector({ selected, onSelect, layout = "horizontal" }: VisualizerSelectorProps) {

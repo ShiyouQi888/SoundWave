@@ -58,8 +58,6 @@ export function PlayerBar() {
     return `${minutes}:${seconds.toString().padStart(2, "0")}`
   }
 
-  const progress = duration > 0 ? (currentTime / duration) * 100 : 0
-
   const getRepeatIcon = () => {
     switch (repeatMode) {
       case "one":
@@ -97,22 +95,14 @@ export function PlayerBar() {
         "h-20",
       )}
     >
-      {/* Progress bar at top */}
-      <div
-        className="h-1 bg-secondary relative cursor-pointer group"
-        onClick={(e) => {
-          const rect = e.currentTarget.getBoundingClientRect()
-          const percent = (e.clientX - rect.left) / rect.width
-          seek(percent * duration)
-        }}
-      >
-        <div
-          className="absolute inset-y-0 left-0 bg-gradient-to-r from-primary to-accent transition-all"
-          style={{ width: `${progress}%` }}
-        />
-        <div
-          className="absolute top-1/2 -translate-y-1/2 w-3 h-3 bg-primary rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg shadow-primary/50"
-          style={{ left: `${progress}%`, transform: `translate(-50%, -50%)` }}
+      {/* Progress bar at top - Using Slider for draggability */}
+      <div className="absolute top-0 left-0 right-0 h-6 -translate-y-1/2 z-20 flex items-center group px-0">
+        <Slider
+          value={[currentTime]}
+          max={duration || 100}
+          step={0.1}
+          onValueChange={(vals) => seek(vals[0])}
+          className="w-full cursor-pointer"
         />
       </div>
 

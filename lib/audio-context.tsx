@@ -19,6 +19,7 @@ export type VisualizerType =
   | "aurora"
   | "vortex"
   | "lightning"
+  | "spheres"
 
 export interface AudioTrack {
   id: string
@@ -93,6 +94,8 @@ interface AudioContextType {
   prevTrack: () => void
   setRepeatMode: (mode: "none" | "one" | "all") => void
   toggleShuffle: () => void
+  getAudioStream: () => MediaStream | null
+  getAnalyserData: () => Uint8Array
 
   // Fullscreen
   isFullscreen: boolean
@@ -153,6 +156,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
   const trebleFilterRef = useRef<BiquadFilterNode | null>(null)
   const compressorRef = useRef<DynamicsCompressorNode | null>(null)
   const animationRef = useRef<number>()
+  const recorderDestRef = useRef<MediaStreamDestinationNode | null>(null)
 
   useEffect(() => {
     const saved = localStorage.getItem("savedPlaylists")
@@ -199,12 +203,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     compressor.attack.value = 0.003
     compressor.release.value = 0.25
 
+    const recorderDest = ctx.createMediaStreamDestination()
+
     source.connect(bassFilter)
     bassFilter.connect(trebleFilter)
     trebleFilter.connect(compressor)
     compressor.connect(gain)
     gain.connect(analyser)
     analyser.connect(ctx.destination)
+    analyser.connect(recorderDest)
 
     audioContextRef.current = ctx
     analyserRef.current = analyser
@@ -213,6 +220,7 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     bassFilterRef.current = bassFilter
     trebleFilterRef.current = trebleFilter
     compressorRef.current = compressor
+    recorderDestRef.current = recorderDest
   }, [effects.bass, effects.treble, effects.compression])
 
   useEffect(() => {
@@ -262,10 +270,15 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [currentTrack],
   )
 
-  const selectTrack = useCallback((track: AudioTrack) => {
-    setCurrentTrack(track)
-    setIsPlaying(false)
-  }, [])
+  const selectTrack = useCallback(
+    (track: AudioTrack, shouldPlay?: boolean) => {
+      setCurrentTrack(track)
+      if (shouldPlay !== undefined) {
+        setIsPlaying(shouldPlay)
+      }
+    },
+    [],
+  )
 
   const importPlaylist = useCallback(
     async (playlistUrl: string, source: "qqmusic" | "netease") => {
@@ -320,22 +333,40 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
 
   const togglePlay = useCallback(async () => {
     if (!audioRef.current || !currentTrack) return
+    setIsPlaying((prev) => !prev)
+  }, [currentTrack])
 
-    if (!audioContextRef.current) {
-      setupAudioContext()
-    }
-
-    if (audioContextRef.current?.state === "suspended") {
-      await audioContextRef.current.resume()
-    }
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !currentTrack) return
 
     if (isPlaying) {
-      audioRef.current.pause()
+      if (!audioContextRef.current) {
+        setupAudioContext()
+      }
+
+      if (audioContextRef.current?.state === "suspended") {
+        audioContextRef.current.resume()
+      }
+
+      const playPromise = audio.play()
+      if (playPromise !== undefined) {
+        playPromise.catch((error) => {
+          console.error("Playback failed:", error)
+          // Don't immediately set isPlaying to false, 
+          // as it might be a temporary issue or require another gesture
+        })
+      }
     } else {
-      await audioRef.current.play()
+      audio.pause()
     }
-    setIsPlaying(!isPlaying)
-  }, [currentTrack, isPlaying, setupAudioContext])
+  }, [currentTrack?.id, isPlaying, setupAudioContext])
+
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = isMuted ? 0 : volume
+    }
+  }, [volume, isMuted])
 
   const seek = useCallback((time: number) => {
     if (audioRef.current) {
@@ -373,25 +404,55 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     [currentTime, duration],
   )
 
-  const nextTrack = useCallback(() => {
-    if (playlist.length === 0) return
-    const currentIndex = playlist.findIndex((t) => t.id === currentTrack?.id)
-    let nextIndex: number
+  const nextTrack = useCallback(
+    (isAuto: boolean | any = false) => {
+      if (playlist.length === 0) return
+      const currentIndex = playlist.findIndex((t) => t.id === currentTrack?.id)
+      let nextIndex: number
+      const auto = isAuto === true
 
-    if (isShuffled) {
-      nextIndex = Math.floor(Math.random() * playlist.length)
-    } else {
-      nextIndex = (currentIndex + 1) % playlist.length
-    }
-    selectTrack(playlist[nextIndex])
-  }, [playlist, currentTrack, selectTrack, isShuffled])
+      if (isShuffled && playlist.length > 1) {
+        // Pick a random index other than current
+        let randomIndex
+        do {
+          randomIndex = Math.floor(Math.random() * playlist.length)
+        } while (randomIndex === currentIndex)
+        nextIndex = randomIndex
+      } else {
+        nextIndex = currentIndex + 1
+        // If it's sequential (none) and we reached the end, stop if it's auto-play
+        if (nextIndex >= playlist.length) {
+          if (auto && repeatMode === "none") {
+            setIsPlaying(false)
+            return
+          }
+          nextIndex = 0 // Loop back to start for manual next or repeat all
+        }
+      }
+      selectTrack(playlist[nextIndex], isPlaying || auto)
+    },
+    [playlist, currentTrack, selectTrack, isShuffled, repeatMode, isPlaying],
+  )
 
   const prevTrack = useCallback(() => {
     if (playlist.length === 0) return
     const currentIndex = playlist.findIndex((t) => t.id === currentTrack?.id)
-    const prevIndex = currentIndex <= 0 ? playlist.length - 1 : currentIndex - 1
-    selectTrack(playlist[prevIndex])
-  }, [playlist, currentTrack, selectTrack])
+    let prevIndex: number
+
+    if (isShuffled && playlist.length > 1) {
+      let randomIndex
+      do {
+        randomIndex = Math.floor(Math.random() * playlist.length)
+      } while (randomIndex === currentIndex)
+      prevIndex = randomIndex
+    } else {
+      prevIndex = currentIndex - 1
+      if (prevIndex < 0) {
+        prevIndex = playlist.length - 1
+      }
+    }
+    selectTrack(playlist[prevIndex], isPlaying)
+  }, [playlist, currentTrack, selectTrack, isShuffled, isPlaying])
 
   const toggleShuffle = useCallback(() => {
     setIsShuffled((prev) => !prev)
@@ -413,14 +474,12 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
     if (repeatMode === "one") {
       if (audioRef.current) {
         audioRef.current.currentTime = 0
-        audioRef.current.play()
+        audioRef.current.play().catch(console.error)
       }
-    } else if (repeatMode === "all" || playlist.length > 1) {
-      nextTrack()
     } else {
-      setIsPlaying(false)
+      nextTrack(true)
     }
-  }, [nextTrack, repeatMode, playlist.length])
+  }, [nextTrack, repeatMode])
 
   const toggleFullscreen = useCallback(() => {
     if (!document.fullscreenElement) {
@@ -430,6 +489,22 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
       document.exitFullscreen()
       setIsFullscreen(false)
     }
+  }, [])
+
+  const getAudioStream = useCallback(() => {
+    if (!recorderDestRef.current) {
+      setupAudioContext()
+    }
+    return recorderDestRef.current?.stream || null
+  }, [setupAudioContext])
+
+  const getAnalyserData = useCallback(() => {
+    if (analyserRef.current) {
+      const dataArray = new Uint8Array(analyserRef.current.frequencyBinCount)
+      analyserRef.current.getByteFrequencyData(dataArray)
+      return dataArray
+    }
+    return new Uint8Array(256)
   }, [])
 
   useEffect(() => {
@@ -477,6 +552,8 @@ export function AudioProvider({ children }: { children: React.ReactNode }) {
         prevTrack,
         setRepeatMode,
         toggleShuffle,
+        getAudioStream,
+        getAnalyserData,
         isFullscreen,
         toggleFullscreen,
         audioRef,
